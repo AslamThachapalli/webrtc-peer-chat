@@ -27,21 +27,33 @@ let init = async () => {
 
     channel.on('MemberJoined', handleUserJoined)
 
+    client.on('MessageFromPeer', handleMessageFromPeer)
+
     localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: false})
     document.getElementById("user-1").srcObject = localStream
 
-    createOffer()
+}
+
+let handleMessageFromPeer = async (message, MemberId) => {
+    message = JSON.parse(message.text)
+    console.log('message:', message)
 }
 
 let handleUserJoined = async (MemberId) => {
     console.log('A New User Joined', MemberId)
+    createOffer(MemberId)
 }
 
-let createOffer = async () => {
+let createOffer = async (MemberId) => {
     peerConnection = new RTCPeerConnection(servers)
 
     remoteStream = new MediaStream()
     document.getElementById("user-2").srcObject = remoteStream
+
+    if(!localStream){
+        localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: false})
+        document.getElementById("user-1").srcObject = localStream
+    }
 
     localStream.getTracks().forEach((track) => {
         peerConnection.addTrack(track, localStream)
@@ -55,6 +67,7 @@ let createOffer = async () => {
 
     peerConnection.onicecandidate = async (event) => {
         if(event.candidate){
+            client.sendMessageToPeer({text: JSON.stringify({'type': 'candidate', 'candidate': event.candidate})}, MemberId)
             console.log("New Ice Candidate", event.candidate)
         }
     }
@@ -63,6 +76,8 @@ let createOffer = async () => {
     await peerConnection.setLocalDescription(offer)
 
     console.log('offer', offer)
+
+    client.sendMessageToPeer({text: JSON.stringify({'type': 'offer', 'offer': offer})}, MemberId)
 }
 
 init()
