@@ -37,6 +37,20 @@ let init = async () => {
 let handleMessageFromPeer = async (message, MemberId) => {
     message = JSON.parse(message.text)
     console.log('message:', message)
+
+    if(message.type === 'offer'){
+        createAnswer(MemberId, message.offer)
+    }
+
+    if(message.type === 'answer'){
+        addAnswer(message.answer)
+    }
+
+    if(message.type === 'candidate'){
+        if(peerConnection){
+            peerConnection.addIceCandidate(message.candidate)
+        }
+    }
 }
 
 let handleUserJoined = async (MemberId) => {
@@ -44,7 +58,7 @@ let handleUserJoined = async (MemberId) => {
     createOffer(MemberId)
 }
 
-let createOffer = async (MemberId) => {
+let createPeerConnection = async (MemberId) => {
     peerConnection = new RTCPeerConnection(servers)
 
     remoteStream = new MediaStream()
@@ -71,6 +85,10 @@ let createOffer = async (MemberId) => {
             console.log("New Ice Candidate", event.candidate)
         }
     }
+}
+
+let createOffer = async (MemberId) => {
+    await createPeerConnection(MemberId)
 
     var offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer)
@@ -78,6 +96,23 @@ let createOffer = async (MemberId) => {
     console.log('offer', offer)
 
     client.sendMessageToPeer({text: JSON.stringify({'type': 'offer', 'offer': offer})}, MemberId)
+}
+
+let createAnswer = async (MemberId, offer) => {
+    await createPeerConnection(MemberId)
+
+    await peerConnection.setRemoteDescription(offer)
+
+    var answer = await peerConnection.createAnswer()
+    await peerConnection.setLocalDescription(answer)
+
+    client.sendMessageToPeer({text: JSON.stringify({'type': 'answer', 'answer': answer})}, MemberId)
+}
+
+let addAnswer = async (answer) => {
+    if(!peerConnection.currentRemoteDescription){
+        peerConnection.setRemoteDescription(answer)
+    }
 }
 
 init()
